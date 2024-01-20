@@ -1,0 +1,14 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Setuptools stuff
+*.egg-info/
+*.spec
+build/
+dist/
+releases/
+
+# PyCharm stuff
+.idea/
+
