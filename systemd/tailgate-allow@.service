@@ -1,0 +1,33 @@
+[Unit]
+Description=Permits Tailscale traffic through the specified network interface and port
+After=tailscaled.service
+BindsTo=tailscaled.service
+
+[Service]
+ExecStartPre=-/bin/sh -c "PORT=$(echo -n %i | awk -F '-' '{print $NF}'); \
+                          iptables -N tailgate-out > /dev/null 2>&1 && \
+                          iptables -I OUTPUT -j tailgate-out && \
+                          iptables -A tailgate-out -p udp --sport $PORT -j DROP"
+
+ExecStartPre=/bin/sh -c "INTERFACE=$(echo -n %i | rev | cut -d '-' -f 2- | rev); PORT=$(echo -n %i | awk -F '-' '{print $NF}'); \
+                         iptables -C tailgate-out -o $INTERFACE -p udp --sport $PORT -j ACCEPT > /dev/null 2>&1 || \
+                         iptables -I tailgate-out -o $INTERFACE -p udp --sport $PORT -j ACCEPT"
+
+ExecStart=/bin/true
+
+ExecStop=-/bin/sh -c "INTERFACE=$(echo -n %i | rev | cut -d '-' -f 2- | rev); PORT=$(echo -n %i | awk -F '-' '{print $NF}'); \
+                      iptables -D tailgate-out -o $INTERFACE -p udp --sport $PORT -j ACCEPT > /dev/null 2>&1"
+
+ExecStop=-/bin/sh -c "PORT=$(echo -n %i | awk -F '-' '{print $NF}'); \
+                      [ $(iptables -L tailgate-out | wc -l) -le 3 ] && \
+                      iptables -D tailgate-out -p udp --sport $PORT -j DROP > /dev/null 2>&1"
+
+ExecStopPost=-/bin/sh -c "[ $(iptables -L tailgate-out | wc -l) -le 2 ] && \
+                          iptables -D OUTPUT -j tailgate-out && \
+                          iptables -X tailgate-out"
+
+Type=oneshot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
