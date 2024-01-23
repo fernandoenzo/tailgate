@@ -7,6 +7,3 @@ ExecStart=/bin/sh -c "PORT=$(lsof -i4UDP -P -n | grep -i 'tailscale' | awk '{pri
                       systemctl start tailgate-allow@%i-$PORT.service"
 Type=oneshot
 RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target

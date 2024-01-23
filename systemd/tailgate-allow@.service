@@ -28,6 +28,3 @@ ExecStopPost=-/bin/sh -c "{ [ $(iptables -L tailgate-out 2>/dev/null | wc -l) -l
 
 Type=oneshot
 RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
