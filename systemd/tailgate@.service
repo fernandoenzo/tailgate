@@ -3,8 +3,8 @@ Description=Enables Tailscale usage through the specified network interface %i
 After=tailscaled.service
 
 [Service]
-ExecStart=/bin/sh -c "systemctl start tailgate-allow@%i-$(sudo lsof -i4UDP -P -n | grep -i 'tailscale' | awk '{print $9}' | cut -d: -f2).service"
-#ExecStart=/bin/sh -c 'systemctl start tailgate-allow@%i-$(ss -lunp | grep "tailscale" | grep "0.0.0.0:" | cut -d ":" -f 2 | cut -d " " -f 1).service'
+ExecStart=/bin/sh -c "PORT=$(lsof -i4UDP -P -n | grep -i 'tailscale' | awk '{print $9}' | cut -d: -f2); \
+                      systemctl start tailgate-allow@%i-$PORT.service"
 Type=oneshot
 RemainAfterExit=yes
 

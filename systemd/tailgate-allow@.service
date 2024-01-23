@@ -19,12 +19,12 @@ ExecStop=-/bin/sh -c "INTERFACE=$(echo -n %i | rev | cut -d '-' -f 2- | rev); PO
                       iptables -D tailgate-out -o $INTERFACE -p udp --sport $PORT -j ACCEPT > /dev/null 2>&1"
 
 ExecStop=-/bin/sh -c "PORT=$(echo -n %i | awk -F '-' '{print $NF}'); \
-                      [ $(iptables -L tailgate-out | wc -l) -le 3 ] && \
-                      iptables -D tailgate-out -p udp --sport $PORT -j DROP > /dev/null 2>&1"
+                      { [ $(iptables -L tailgate-out 2>/dev/null | wc -l) -le 3 ] && \
+                      iptables -D tailgate-out -p udp --sport $PORT -j DROP > /dev/null 2>&1; } || true"
 
-ExecStopPost=-/bin/sh -c "[ $(iptables -L tailgate-out | wc -l) -le 2 ] && \
+ExecStopPost=-/bin/sh -c "{ [ $(iptables -L tailgate-out 2>/dev/null | wc -l) -le 2 ] && \
                           iptables -D OUTPUT -j tailgate-out && \
-                          iptables -X tailgate-out"
+                          iptables -X tailgate-out; } || true"
 
 Type=oneshot
 RemainAfterExit=yes
