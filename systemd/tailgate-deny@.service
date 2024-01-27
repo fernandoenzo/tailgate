@@ -1,0 +1,24 @@
+[Unit]
+Description=Denies Tailscale traffic through the specified network interface
+After=tailscaled.service
+BindsTo=tailscaled.service
+
+[Service]
+ExecStartPre=-/bin/sh -c "iptables -N tailgate > /dev/null 2>&1 && \
+                          iptables -I OUTPUT -j tailgate"
+
+ExecStartPre=/bin/sh -c "INTERFACE=%i; PORT=$(ss -lunp4 | awk '/tailscale/ {split($4, arr, \":\"); print arr[2]}'); \
+                         iptables -C tailgate -o $INTERFACE -p udp --sport $PORT -j DROP > /dev/null 2>&1 || \
+                         iptables -I tailgate -o $INTERFACE -p udp --sport $PORT -j DROP"
+
+ExecStart=/bin/true
+
+ExecStop=-/bin/sh -c "INTERFACE=%i; PORT=$(iptables -S | awk \"/-A tailgate -o $INTERFACE -p udp -m udp --sport/ {print \$10}\"); \
+                      iptables -D tailgate -o $INTERFACE -p udp --sport $PORT -j DROP > /dev/null 2>&1"
+
+ExecStopPost=-/bin/sh -c "{ [ $(iptables -L tailgate 2>/dev/null | wc -l) -le 2 ] && \
+                          iptables -D OUTPUT -j tailgate && \
+                          iptables -X tailgate; } || true"
+
+Type=oneshot
+RemainAfterExit=yes
