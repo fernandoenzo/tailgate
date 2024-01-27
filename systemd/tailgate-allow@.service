@@ -1,15 +1,15 @@
 [Unit]
-Description=Permits Tailscale traffic through the specified network interface
+Description=Permits Tailscale traffic only through the specified network interface
 After=tailscaled.service
 BindsTo=tailscaled.service
 
 [Service]
-ExecStartPre=-/bin/sh -c "PORT=$(lsof -i4UDP -P -n | grep -i 'tailscale' | awk '{print $9}' | cut -d: -f2); \
+ExecStartPre=-/bin/sh -c "PORT=$(ss -lunp4 | awk '/tailscale/ {split($4, arr, \":\"); print arr[2]}'); \
                           iptables -N tailgate > /dev/null 2>&1 && \
                           iptables -I OUTPUT -j tailgate && \
                           iptables -A tailgate -p udp --sport $PORT -j DROP"
 
-ExecStartPre=/bin/sh -c "INTERFACE=%i; PORT=$(lsof -i4UDP -P -n | grep -i 'tailscale' | awk '{print $9}' | cut -d: -f2); \
+ExecStartPre=/bin/sh -c "INTERFACE=%i; PORT=$(ss -lunp4 | awk '/tailscale/ {split($4, arr, \":\"); print arr[2]}'); \
                          iptables -C tailgate -o $INTERFACE -p udp --sport $PORT -j ACCEPT > /dev/null 2>&1 || \
                          iptables -I tailgate -o $INTERFACE -p udp --sport $PORT -j ACCEPT"
 
