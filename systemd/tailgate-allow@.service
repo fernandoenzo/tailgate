@@ -2,29 +2,38 @@
 Description=Permits Tailscale traffic only through the specified network interface
 After=tailscaled.service
 BindsTo=tailscaled.service
+StartLimitIntervalSec=0
+#StartLimitIntervalSec=25
+#StartLimitBurst=10
 
 [Service]
-ExecStartPre=-/bin/sh -c "PORT=$(ss -lunp4 | awk '/tailscale/ {split($4, arr, \":\"); print arr[2]}'); \
+ExecStartPre=/bin/sh -c 'PORT=$(ss -lunp4 | awk "/tailscale/ {split(\\$4, arr, \\":\\"); print arr[2]}"); \
+                         if [ -z "$PORT" ] || [ $(echo "$PORT" | wc -l) -gt 1 ]; then exit 1; \
+                         else echo "$PORT" > /run/tailgate-%i.port; fi'
+
+ExecStartPre=-/bin/sh -c 'PORT=$(cat /run/tailgate-%i.port); \
                           iptables -N tailgate > /dev/null 2>&1 && \
                           iptables -I OUTPUT -j tailgate && \
-                          iptables -A tailgate -p udp --sport $PORT -j DROP"
+                          iptables -A tailgate -p udp --sport $PORT -j DROP'
 
-ExecStartPre=/bin/sh -c "INTERFACE=%i; PORT=$(ss -lunp4 | awk '/tailscale/ {split($4, arr, \":\"); print arr[2]}'); \
+ExecStartPre=/bin/sh -c 'INTERFACE=%i; PORT=$(cat /run/tailgate-%i.port); \
                          iptables -C tailgate -o $INTERFACE -p udp --sport $PORT -j ACCEPT > /dev/null 2>&1 || \
-                         iptables -I tailgate -o $INTERFACE -p udp --sport $PORT -j ACCEPT"
+                         iptables -I tailgate -o $INTERFACE -p udp --sport $PORT -j ACCEPT'
 
-ExecStart=/bin/true
+ExecStart=/bin/sh -c 'rm /run/tailgate-%i.port'
 
-ExecStop=-/bin/sh -c "INTERFACE=%i; PORT=$(iptables -S | awk \"/-A tailgate -o $INTERFACE -p udp -m udp --sport/ {print \$10}\"); \
-                      iptables -D tailgate -o $INTERFACE -p udp --sport $PORT -j ACCEPT > /dev/null 2>&1"
+ExecStop=-/bin/sh -c 'INTERFACE=%i; PORT=$(iptables -S | awk "/-A tailgate -o $INTERFACE -p udp -m udp --sport/ {print \\$10}"); \
+                      iptables -D tailgate -o $INTERFACE -p udp --sport $PORT -j ACCEPT > /dev/null 2>&1'
 
-ExecStop=-/bin/sh -c "PORT=$(iptables -S | awk '/-A tailgate -p udp -m udp --sport/ {print $8}'); \
+ExecStop=-/bin/sh -c 'PORT=$(iptables -S | awk "/-A tailgate -p udp -m udp --sport/ {print \\$8}"); \
                       { [ $(iptables -L tailgate 2>/dev/null | wc -l) -le 3 ] && \
-                      iptables -D tailgate -p udp --sport $PORT -j DROP > /dev/null 2>&1; } || true"
+                      iptables -D tailgate -p udp --sport $PORT -j DROP > /dev/null 2>&1; } || true'
 
-ExecStopPost=-/bin/sh -c "{ [ $(iptables -L tailgate 2>/dev/null | wc -l) -le 2 ] && \
+ExecStopPost=-/bin/sh -c '{ [ $(iptables -L tailgate 2>/dev/null | wc -l) -le 2 ] && \
                           iptables -D OUTPUT -j tailgate && \
-                          iptables -X tailgate; } || true"
+                          iptables -X tailgate; } || true'
 
 Type=oneshot
+Restart=on-failure
+#RestartSec=2s
 RemainAfterExit=yes
