@@ -2,14 +2,11 @@
 Description=Denies Tailscale traffic through the specified network interface
 After=tailscaled.service
 BindsTo=tailscaled.service
-StartLimitIntervalSec=0
-#StartLimitIntervalSec=25
-#StartLimitBurst=10
 
 [Service]
-ExecStartPre=/bin/sh -c 'PORT=$(ss -lunp4 | awk "/tailscale/ {split(\\$4, arr, \\":\\"); print arr[2]}"); \
-                         if [ -z "$PORT" ] || [ $(echo "$PORT" | wc -l) -gt 1 ]; then exit 1; \
-                         else echo "$PORT" > /run/tailgate-%i.port; fi'
+ExecStartPre=/bin/sh -c 'while true; do PORT=$(ss -lunp4 | awk "/tailscale/ {split(\\$4, arr, \\":\\"); print arr[2]}"); \
+                         if [ -z "$PORT" ] || [ $(echo "$PORT" | wc -l) -gt 1 ]; then sleep 0.01; \
+                         else echo "$PORT" > /run/tailgate-%i.port; break; fi; done'
 
 ExecStartPre=-/bin/sh -c 'iptables -N tailgate > /dev/null 2>&1 && \
                           iptables -I OUTPUT -j tailgate'
@@ -29,5 +26,4 @@ ExecStopPost=-/bin/sh -c '{ [ $(iptables -L tailgate 2>/dev/null | wc -l) -le 2 
 
 Type=oneshot
 Restart=on-failure
-#RestartSec=2s
 RemainAfterExit=yes
